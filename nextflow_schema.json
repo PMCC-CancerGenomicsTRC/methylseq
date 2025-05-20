@@ -383,7 +383,6 @@
                 "use_gpu": {
                     "type": "boolean",
                     "description": "Run Parabricks GPU-accelerated fq2bammeth module for alignment",
-                    "default": false,
                     "fa_icon": "fas fa-dot-circle"
                 },
                 "min_depth": {
@@ -611,6 +610,18 @@
                     "hidden": true
                 }
             }
+        },
+        "umi_handling": {
+            "title": "UMI Handling",
+            "type": "object",
+            "description": "Define how to handle UMIs in data",
+            "default": "",
+            "properties": {
+                "has_umi": {
+                    "type": "boolean",
+                    "description": "Boolean indicating whether UMIs are in the data"
+                }
+            }
         }
     },
     "allOf": [
@@ -648,10 +659,13 @@
             "$ref": "#/$defs/run_pipeline_steps"
         },
         {
+            "$ref": "#/$defs/institutional_config_options"
+        },
+        {
             "$ref": "#/$defs/generic_options"
         },
         {
-            "$ref": "#/$defs/institutional_config_options"
+            "$ref": "#/$defs/umi_handling"
         }
     ]
 }
