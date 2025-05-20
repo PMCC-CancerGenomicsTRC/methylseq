@@ -6,6 +6,9 @@
 
 include { paramsSummaryMap          } from 'plugin/nf-schema'
 include { FASTQC                    } from '../../modules/nf-core/fastqc/main'
+include { FASTP                     } from '../../modules/nf-core/fastp/main'
+// Run FastQC again after umi trimming
+include { FASTQC as FASTQC_TRIM     } from '../../modules/nf-core/fastqc/main' 
 include { TRIMGALORE                } from '../../modules/nf-core/trimgalore/main'
 include { QUALIMAP_BAMQC            } from '../../modules/nf-core/qualimap/bamqc/main'
 include { PRESEQ_LCEXTRAP           } from '../../modules/nf-core/preseq/lcextrap/main'
@@ -66,8 +69,32 @@ workflow METHYLSEQ {
     ch_fastq    = CAT_FASTQ.out.reads.mix(ch_samplesheet.single)
     ch_versions = ch_versions.mix(CAT_FASTQ.out.versions.first())
 
+    // MODULE: run FASTP for UMI trimming
+    if (!params.has_umi) {
+        FASTP( ch_fastq )
+        ch_versions = ch_versions.mix(FASTP.out.versions)
+
+        FASTQC_TRIM( FASTP.out.reads )
+        ch_versions = ch_versions.mix( FASTQC_TRIM.out.versions )
+    }
+
     //
-    // MODULE: Run FastQC
+    // MODULE: Run TrimGalore!
+    //
+    if (!params.skip_trimming) {
+        TRIMGALORE(
+            FASTP.out.reads
+        )
+        ch_reads    = TRIMGALORE.out.reads
+        ch_versions = ch_versions.mix(TRIMGALORE.out.versions.first())
+    } else {
+        ch_reads    = ch_fastq
+    }
+
+    //
+
+    //
+    // MODULE: Run FastQC -- Moved to run after Trimgalore, as TrimGalore is used to remove poor quality
     //
     FASTQC (
         ch_fastq
@@ -76,19 +103,6 @@ workflow METHYLSEQ {
     ch_fastqc_zip    = FASTQC.out.zip
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{ meta, zip -> zip })
     ch_versions      = ch_versions.mix(FASTQC.out.versions.first())
-
-    //
-    // MODULE: Run TrimGalore!
-    //
-    if (!params.skip_trimming) {
-        TRIMGALORE(
-            ch_fastq
-        )
-        ch_reads    = TRIMGALORE.out.reads
-        ch_versions = ch_versions.mix(TRIMGALORE.out.versions.first())
-    } else {
-        ch_reads    = ch_fastq
-    }
 
     //
     // SUBWORKFLOW: Align reads, deduplicate and extract methylation with Bismark
