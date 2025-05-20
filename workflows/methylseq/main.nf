@@ -76,17 +76,20 @@ workflow METHYLSEQ {
 
         FASTQC_TRIM( FASTP.out.reads )
         ch_versions = ch_versions.mix( FASTQC_TRIM.out.versions )
-
-        ch_fastq = FASTP.out.reads
     }
 
     //
     // MODULE: Run TrimGalore!
     //
     if (!params.skip_trimming) {
-        TRIMGALORE(
-            ch_fastq
-        )
+        if (!params.has_umi) {
+            TRIMGALORE(
+                ch_fastq
+            )
+        } else {
+            TRIMGALORE( FASTP.out.reads )
+        }
+
         ch_reads    = TRIMGALORE.out.reads
         ch_versions = ch_versions.mix(TRIMGALORE.out.versions.first())
     } else {
