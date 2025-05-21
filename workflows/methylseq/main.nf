@@ -70,8 +70,8 @@ workflow METHYLSEQ {
     ch_versions = ch_versions.mix(CAT_FASTQ.out.versions.first())
 
     // MODULE: run FASTP for UMI trimming
-    if (!params.has_umi) {
-        FASTP( ch_fastq )
+    if (params.has_umi) {
+        FASTP( ch_fastq, [], false, false, false )
         ch_versions = ch_versions.mix(FASTP.out.versions)
 
         ch_reads_to_trim = FASTP.out.reads
