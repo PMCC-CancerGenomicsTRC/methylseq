@@ -621,6 +621,10 @@
                     "type": "boolean",
                     "description": "Boolean indicating whether UMIs are in the data"
                 },
+                "amplicon": {
+                    "type": "boolean",
+                    "description": "Boolean to indicated data is amplicon based"
+                },
                 "primer_fasta": {
                     "type": "string",
                     "description": "Path to fasta file listing primers"
