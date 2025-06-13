@@ -88,7 +88,7 @@ workflow METHYLSEQ {
         FASTP_PRIMERS( ch_reads_to_trim, ch_primer_fasta, [], [], [] )
         ch_versions = ch_versions.mix( FASTP_PRIMERS.out.versions )
 
-        ch_primer_trimmed_reads = FASTP.out.reads
+        ch_primer_trimmed_reads = FASTP_PRIMERS.out.reads
     } else {
         ch_primer_trimmed_reads = ch_reads_to_trim
     }
