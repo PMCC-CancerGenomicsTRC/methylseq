@@ -33,6 +33,13 @@ params.bismark_index = params.aligner == 'bismark_hisat' ? getGenomeAttribute('b
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    INITIALISE INPUTS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+ch_primer_fasta = params.primer_fasta ? Channel.fromPath(params.primer_fasta): Channel.value([])
+
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     NAMED WORKFLOWS FOR PIPELINE
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
@@ -71,6 +78,7 @@ workflow NFCORE_METHYLSEQ {
         FASTA_INDEX_BISMARK_BWAMETH.out.fasta_index,
         FASTA_INDEX_BISMARK_BWAMETH.out.bismark_index,
         FASTA_INDEX_BISMARK_BWAMETH.out.bwameth_index,
+        ch_primer_fasta
     )
     ch_versions = ch_versions.mix(METHYLSEQ.out.versions)
 

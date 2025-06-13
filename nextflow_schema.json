@@ -611,15 +611,19 @@
                 }
             }
         },
-        "umi_handling": {
-            "title": "UMI Handling",
+        "amplicon_options": {
+            "title": "Amplicon handling options",
             "type": "object",
-            "description": "Define how to handle UMIs in data",
+            "description": "Boolean options to address additional constructs (i.e. UMI/primers) in data",
             "default": "",
             "properties": {
                 "has_umi": {
                     "type": "boolean",
                     "description": "Boolean indicating whether UMIs are in the data"
+                },
+                "primer_fasta": {
+                    "type": "string",
+                    "description": "Path to fasta file listing primers"
                 }
             }
         }
@@ -665,7 +669,7 @@
             "$ref": "#/$defs/generic_options"
         },
         {
-            "$ref": "#/$defs/umi_handling"
+            "$ref": "#/$defs/amplicon_options"
         }
     ]
 }
