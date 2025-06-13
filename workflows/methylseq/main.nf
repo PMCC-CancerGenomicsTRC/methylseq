@@ -7,6 +7,7 @@
 include { paramsSummaryMap          } from 'plugin/nf-schema'
 include { FASTQC                    } from '../../modules/nf-core/fastqc/main'
 include { FASTP                     } from '../../modules/nf-core/fastp/main'
+include { FASTP as FASTP_PRIMERS     } from '../../modules/nf-core/fastp/main'
 // Run FastQC again after umi trimming
 include { FASTQC as FASTQC_TRIM     } from '../../modules/nf-core/fastqc/main' 
 include { TRIMGALORE                } from '../../modules/nf-core/trimgalore/main'
@@ -36,6 +37,7 @@ workflow METHYLSEQ {
     ch_fasta_index     // channel: [ path(fasta index)     ]
     ch_bismark_index   // channel: [ path(bismark index)   ]
     ch_bwameth_index   // channel: [ path(bwameth index)   ]
+    ch_primer_fasta    // channel: [ path(primer fasta)]
 
     main:
 
@@ -76,17 +78,26 @@ workflow METHYLSEQ {
 
         ch_reads_to_trim = FASTP.out.reads
 
-        FASTQC_TRIM( FASTP.out.reads )
-        ch_versions = ch_versions.mix( FASTQC_TRIM.out.versions )
+        FASTQC( FASTP.out.reads )
+        ch_versions = ch_versions.mix( FASTQC.out.versions )
     } else {
         ch_reads_to_trim = ch_fastq
+    }
+
+    if (params.amplicon) {
+        FASTP_PRIMERS( ch_reads_to_trim, ch_primer_fasta, [], [], [] )
+        ch_versions = ch_versions.mix( FASTP_PRIMERS.out.versions )
+
+        ch_primer_trimmed_reads = FASTP.out.reads
+    } else {
+        ch_primer_trimmed_reads = ch_reads_to_trim
     }
 
     //
     // MODULE: Run TrimGalore!
     //
     if (!params.skip_trimming) {
-        TRIMGALORE( ch_reads_to_trim )
+        TRIMGALORE( ch_primer_trimmed_reads )
 
         ch_reads    = TRIMGALORE.out.reads
         ch_versions = ch_versions.mix(TRIMGALORE.out.versions.first())
@@ -99,13 +110,13 @@ workflow METHYLSEQ {
     //
     // MODULE: Run FastQC -- Moved to run after Trimgalore, as TrimGalore is used to remove poor quality
     //
-    FASTQC (
-        ch_fastq
+    FASTQC_TRIM(
+        ch_reads
     )
-    ch_fastqc_html   = FASTQC.out.html
-    ch_fastqc_zip    = FASTQC.out.zip
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{ meta, zip -> zip })
-    ch_versions      = ch_versions.mix(FASTQC.out.versions.first())
+    ch_fastqc_html   = FASTQC_TRIM.out.html
+    ch_fastqc_zip    = FASTQC_TRIM.out.zip
+    ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIM.out.zip.collect{ meta, zip -> zip })
+    ch_versions      = ch_versions.mix(FASTQC_TRIM.out.versions.first())
 
     //
     // SUBWORKFLOW: Align reads, deduplicate and extract methylation with Bismark
@@ -218,7 +229,7 @@ workflow METHYLSEQ {
     if (!params.skip_trimming) {
         ch_multiqc_files = ch_multiqc_files.mix(TRIMGALORE.out.log.collect{ it[1] })
     }
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{ it[1] }.ifEmpty([]))
+    ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIM.out.zip.collect{ it[1] }.ifEmpty([]))
 
     MULTIQC (
         ch_multiqc_files.collect(),
