@@ -8,6 +8,7 @@ include { paramsSummaryMap          } from 'plugin/nf-schema'
 include { FASTQC                    } from '../../modules/nf-core/fastqc/main'
 include { FASTP                     } from '../../modules/nf-core/fastp/main'
 include { FASTP as FASTP_PRIMERS     } from '../../modules/nf-core/fastp/main'
+include { CUTADAPT                     } from '../../modules/nf-core/cutadapt/main'
 // Run FastQC again after umi trimming
 include { FASTQC as FASTQC_TRIM     } from '../../modules/nf-core/fastqc/main' 
 include { TRIMGALORE                } from '../../modules/nf-core/trimgalore/main'
@@ -37,7 +38,8 @@ workflow METHYLSEQ {
     ch_fasta_index     // channel: [ path(fasta index)     ]
     ch_bismark_index   // channel: [ path(bismark index)   ]
     ch_bwameth_index   // channel: [ path(bwameth index)   ]
-    ch_primer_fasta    // channel: [ path(primer fasta)]
+    ch_primer_fasta3    // channel: [ path(primer fasta 3-prime)]
+    ch_primer_fasta5    // channel: [ path(primer fasta 5-prime)]
 
     main:
 
@@ -85,10 +87,12 @@ workflow METHYLSEQ {
     }
 
     if (params.amplicon) {
-        FASTP_PRIMERS( ch_reads_to_trim, ch_primer_fasta, [], [], [] )
-        ch_versions = ch_versions.mix( FASTP_PRIMERS.out.versions )
+        // FASTP_PRIMERS( ch_reads_to_trim, ch_primer_fasta, [], [], [] )
+        // ch_versions = ch_versions.mix( FASTP_PRIMERS.out.versions )
 
-        ch_primer_trimmed_reads = FASTP_PRIMERS.out.reads
+        // ch_primer_trimmed_reads = FASTP_PRIMERS.out.reads
+        CUTADAPT( ch_reads_to_trim, ch_primer_fasta3, ch_primer_fasta5 )
+        ch_primer_trimmed_reads = CUTADAPT.out.reads
     } else {
         ch_primer_trimmed_reads = ch_reads_to_trim
     }
