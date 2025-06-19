@@ -9,6 +9,8 @@ process CUTADAPT {
 
     input:
     tuple val(meta), path(reads)
+    path(adapter_3_fasta)
+    path(adapter_5_fasta)
 
     output:
     tuple val(meta), path('*.trim.fastq.gz'), emit: reads
