@@ -36,8 +36,8 @@ params.bismark_index = params.aligner == 'bismark_hisat' ? getGenomeAttribute('b
     INITIALISE INPUTS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
-ch_primer_fasta3 = params.primer_fasta3 ? Channel.fromPath(params.primer_fasta3): Channel.value([])
-ch_primer_fasta5 = params.primer_fasta5 ? Channel.fromPath(params.primer_fasta5): Channel.value([])
+ch_primer_fasta3 = params.primer_fasta3 ? Channel.fromPath(params.primer_fasta3).first(): Channel.value([])
+ch_primer_fasta5 = params.primer_fasta5 ? Channel.fromPath(params.primer_fasta5).first(): Channel.value([])
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
