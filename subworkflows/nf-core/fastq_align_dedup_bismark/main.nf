@@ -7,6 +7,8 @@ include { BISMARK_COVERAGE2CYTOSINE    } from '../../../modules/nf-core/bismark/
 include { BISMARK_REPORT               } from '../../../modules/nf-core/bismark/report/main'
 include { BISMARK_SUMMARY              } from '../../../modules/nf-core/bismark/summary/main'
 
+include { CORRECTUMI } from '../../../modules/local/correctumi/main'
+
 workflow FASTQ_ALIGN_DEDUP_BISMARK {
 
     take:
@@ -40,7 +42,10 @@ workflow FASTQ_ALIGN_DEDUP_BISMARK {
         ch_fasta,
         ch_bismark_index
     )
-    ch_alignments        = BISMARK_ALIGN.out.bam
+    CORRECTUMI (
+        BISMARK_ALIGN.out.bam
+    )
+    ch_alignments        = CORRECTUMI.out.bam
     ch_alignment_reports = BISMARK_ALIGN.out.report.map{ meta, report -> [ meta, report, [] ] }
     ch_versions = ch_versions.mix(BISMARK_ALIGN.out.versions)
 
