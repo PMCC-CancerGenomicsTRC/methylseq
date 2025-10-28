@@ -24,8 +24,8 @@ process CORRECTUMI {
     samtools \\
         view \\
         -@ $task.cpus \\
-        $bam | awk -F"\t" \
-        '{ split($1,name, ":"); split(name[8],umi,"_"); print name[1]":"name[2]":"name[3]":"name[4]":"name[5]":"name[6]":"name[7]":"umi[2]":"name[9]":"name[10]":"name[11]":"umi[1]"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$8"\t"$9"\t"$10"\t"$11"\t"$12"\t"$13"\t"$14"\t"$15" }' | samtools view -b -p ${prefix}_umiCorrect.bam
+        $bam | awk -F"\\t" \
+        '{ split(\$1,name, ":"); split(name[8],umi,"_"); print name[1]":"name[2]":"name[3]":"name[4]":"name[5]":"name[6]":"name[7]":"umi[2]":"name[9]":"name[10]":"name[11]":"umi[1] "\\t"\$2"\\t"\$3"\\t"\$4"\\t"\$5"\\t"\$6"\\t"\$7"\\t"\$8"\\t"\$9"\\t"\$10"\\t"\$11"\\t"\$12"\\t"\$13"\\t"\$14"\\t"\$15"\\t"\$16 }' | samtools view -b -p ${prefix}_umiCorrect.bam
 
 
     cat <<-END_VERSIONS > versions.yml
