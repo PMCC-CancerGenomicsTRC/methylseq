@@ -57,7 +57,7 @@ workflow FASTQ_ALIGN_DEDUP_BISMARK {
             [[ '-n' ], []]   // name-sort
         )
         ch_alignments = SAMTOOLS_SORT_NAME.out.bam
-        ch_versions   = ch_versions.mix(SAMTOOLS_SORT.out.versions)
+        ch_versions   = ch_versions.mix(SAMTOOLS_SORT_NAME.out.versions)
     
         BISMARK_DEDUPLICATE(ch_alignments)
         ch_alignments = BISMARK_DEDUPLICATE.out.bam
@@ -71,15 +71,16 @@ workflow FASTQ_ALIGN_DEDUP_BISMARK {
         ch_alignments,
         [[:],[]] // [ [meta], [fasta]]
     )
+    ch_alignments = SAMTOOLS_SORT.out.bam
     ch_versions = ch_versions.mix(SAMTOOLS_SORT.out.versions)
 
     /*
      * MODULE: Run samtools index on aligned or deduplicated bam
      */
     SAMTOOLS_INDEX (
-        SAMTOOLS_SORT.out.bam
+        ch_alignments
     )
-    ch_alignments = SAMTOOLS_SORT.out.bam
+    ch_bai      = SAMTOOLS_INDEX.out.bai
     ch_versions = ch_versions.mix(SAMTOOLS_INDEX.out.versions)
 
     /*
@@ -146,8 +147,8 @@ workflow FASTQ_ALIGN_DEDUP_BISMARK {
                             .mix(ch_bismark_report.collect{ meta, report -> report })
 
     emit:
-    bam                        = SAMTOOLS_SORT.out.bam         // channel: [ val(meta), [ bam ] ]
-    bai                        = SAMTOOLS_INDEX.out.bai        // channel: [ val(meta), [ bai ] ]
+    bam                        = ch_alignments                 // channel: [ val(meta), [ bam ] ]
+    bai                        = ch_bai                        // channel: [ val(meta), [ bai ] ]
     coverage2cytosine_coverage = ch_coverage2cytosine_coverage // channel: [ val(meta), [ coverage ] ]
     coverage2cytosine_report   = ch_coverage2cytosine_report   // channel: [ val(meta), [ report ] ]
     coverage2cytosine_summary  = ch_coverage2cytosine_summary  // channel: [ val(meta), [ summary ] ]
