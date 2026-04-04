@@ -44,10 +44,19 @@ workflow FASTQ_ALIGN_DEDUP_BISMARK {
     ch_alignments        = BISMARK_ALIGN.out.bam
     ch_alignment_reports = BISMARK_ALIGN.out.report.map{ meta, report -> [ meta, report, [] ] }
     ch_versions = ch_versions.mix(BISMARK_ALIGN.out.versions)
-        
+
     if (!skip_deduplication) {
+    
         CORRECTUMI(ch_alignments)
         ch_alignments = CORRECTUMI.out.bam
+        ch_versions   = ch_versions.mix(CORRECTUMI.out.versions)
+    
+        SAMTOOLS_SORT(
+            ch_alignments,
+            [[ '-n' ], []]   // name-sort
+        )
+        ch_alignments = SAMTOOLS_SORT.out.bam
+        ch_versions   = ch_versions.mix(SAMTOOLS_SORT.out.versions)
     
         BISMARK_DEDUPLICATE(ch_alignments)
         ch_alignments = BISMARK_DEDUPLICATE.out.bam
@@ -69,6 +78,7 @@ workflow FASTQ_ALIGN_DEDUP_BISMARK {
     SAMTOOLS_INDEX (
         SAMTOOLS_SORT.out.bam
     )
+    ch_alignments = SAMTOOLS_SORT.out.bam
     ch_versions = ch_versions.mix(SAMTOOLS_INDEX.out.versions)
 
     /*
