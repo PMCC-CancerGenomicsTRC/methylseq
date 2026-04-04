@@ -1,5 +1,6 @@
 include { BISMARK_ALIGN                } from '../../../modules/nf-core/bismark/align/main'
 include { CORRECTUMI                   } from '../../../modules/local/correctumi'
+include { SAMTOOLS_SORT_NAME           } from '../../../modules/nf-core/samtools/sort/main'
 include { BISMARK_DEDUPLICATE          } from '../../../modules/nf-core/bismark/deduplicate/main'
 include { SAMTOOLS_SORT                } from '../../../modules/nf-core/samtools/sort/main'
 include { SAMTOOLS_INDEX               } from '../../../modules/nf-core/samtools/index/main'
@@ -50,12 +51,12 @@ workflow FASTQ_ALIGN_DEDUP_BISMARK {
         CORRECTUMI(ch_alignments)
         ch_alignments = CORRECTUMI.out.bam
         ch_versions   = ch_versions.mix(CORRECTUMI.out.versions)
-    
-        SAMTOOLS_SORT(
+
+        SAMTOOLS_SORT_NAME(
             ch_alignments,
             [[ '-n' ], []]   // name-sort
         )
-        ch_alignments = SAMTOOLS_SORT.out.bam
+        ch_alignments = SAMTOOLS_SORT_NAME.out.bam
         ch_versions   = ch_versions.mix(SAMTOOLS_SORT.out.versions)
     
         BISMARK_DEDUPLICATE(ch_alignments)
