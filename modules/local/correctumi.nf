@@ -11,7 +11,7 @@ process CORRECTUMI {
     tuple val(meta), path(bam)
 
     output:
-    tuple val(meta), path("*umiCorrect.namesorted.bam"), emit: bam
+    tuple val(meta), path("${prefix}_umiCorrect.namesorted.bam"), emit: bam
     path "versions.yml", emit: versions
 
     script:
@@ -20,20 +20,19 @@ process CORRECTUMI {
     """
     set -euo pipefail
 
-    # Convert to SAM, rewrite QNAME to append UMI, then name-sort so read pairs are adjacent.
-    # This is required for bismark's deduplicate_bismark on paired-end data.
-    samtools view -h ${bam} \\
-    | awk 'BEGIN{FS=OFS="\\t"}
-           /^@/ { print; next }
-           {
-             # Extract UMI from a field like ...:UMI_<seq>_1:N:0:<index>
-             if (match(\$1, /:UMI_([^:_]+)/, m)) {
-                 sub(/:UMI_.*/, ":" m[1], \$1)
-             }
-             print
-           }' \\
-    | samtools view -b -u - \\
-    | samtools sort -n -@ ${task.cpus} -o ${prefix}_umiCorrect.namesorted.bam -
+    samtools view -h ${bam} | \\
+    awk 'BEGIN{FS=OFS="\\t"}
+         /^@/ { print; next }
+         {
+           # Extract UMI from a field like ...:UMI_<seq>_1:N:0:<index>
+           if (match(\$1, /:UMI_([^:_]+)/, m)) {
+               # Replace everything from :UMI_ onward with :<UMI>
+               sub(/:UMI_.*/, ":" m[1], \$1)
+           }
+           print
+         }' | \\
+    samtools view -b -u - | \\
+    samtools sort -n -@ ${task.cpus} -o ${prefix}_umiCorrect.namesorted.bam -
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
