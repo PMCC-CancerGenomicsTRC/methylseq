@@ -1,13 +1,12 @@
-include { BISMARK_ALIGN                       } from '../../../modules/nf-core/bismark/align/main'
-include { CORRECTUMI                          } from '../../../modules/local/correctumi'
-include { SAMTOOLS_SORT as SAMTOOLS_SORT_NAME } from '../../../modules/nf-core/samtools/sort/main'
-include { BISMARK_DEDUPLICATE                 } from '../../../modules/nf-core/bismark/deduplicate/main'
-include { SAMTOOLS_SORT                       } from '../../../modules/nf-core/samtools/sort/main'
-include { SAMTOOLS_INDEX                      } from '../../../modules/nf-core/samtools/index/main'
-include { BISMARK_METHYLATIONEXTRACTOR        } from '../../../modules/nf-core/bismark/methylationextractor/main'
-include { BISMARK_COVERAGE2CYTOSINE           } from '../../../modules/nf-core/bismark/coverage2cytosine/main'
-include { BISMARK_REPORT                      } from '../../../modules/nf-core/bismark/report/main'
-include { BISMARK_SUMMARY                     } from '../../../modules/nf-core/bismark/summary/main'
+include { BISMARK_ALIGN                } from '../../../modules/nf-core/bismark/align/main'
+include { CORRECTUMI                   } from '../../../modules/local/correctumi'
+include { BISMARK_DEDUPLICATE          } from '../../../modules/nf-core/bismark/deduplicate/main'
+include { SAMTOOLS_SORT                } from '../../../modules/nf-core/samtools/sort/main'
+include { SAMTOOLS_INDEX               } from '../../../modules/nf-core/samtools/index/main'
+include { BISMARK_METHYLATIONEXTRACTOR } from '../../../modules/nf-core/bismark/methylationextractor/main'
+include { BISMARK_COVERAGE2CYTOSINE    } from '../../../modules/nf-core/bismark/coverage2cytosine/main'
+include { BISMARK_REPORT               } from '../../../modules/nf-core/bismark/report/main'
+include { BISMARK_SUMMARY              } from '../../../modules/nf-core/bismark/summary/main'
 
 workflow FASTQ_ALIGN_DEDUP_BISMARK {
 
@@ -21,7 +20,6 @@ workflow FASTQ_ALIGN_DEDUP_BISMARK {
     main:
     ch_alignments                 = Channel.empty()
     ch_alignment_reports          = Channel.empty()
-    ch_bam_for_dedup              = Channel.empty()
     ch_bam_final                  = Channel.empty()
     ch_methylation_bedgraph       = Channel.empty()
     ch_methylation_calls          = Channel.empty()
@@ -46,39 +44,42 @@ workflow FASTQ_ALIGN_DEDUP_BISMARK {
     )
     ch_alignments        = BISMARK_ALIGN.out.bam
     ch_alignment_reports = BISMARK_ALIGN.out.report.map{ meta, report -> [ meta, report, [] ] }
-    ch_versions = ch_versions.mix(BISMARK_ALIGN.out.versions)
+    ch_versions          = ch_versions.mix(BISMARK_ALIGN.out.versions)
 
     if (!skip_deduplication) {
-        CORRECTUMI(ch_alignments)
-        ch_bam_for_dedup = CORRECTUMI.out.bam
-
-        SAMTOOLS_SORT_NAME(
-            ch_bam_for_dedup,
-            [[ '-n' ], []]   // name-sort
+        /*
+         * UMI correction + name-sort (required for deduplicate_bismark paired-end)
+         */
+        CORRECTUMI (
+            ch_alignments
         )
-        ch_bam_for_dedup = SAMTOOLS_SORT_NAME.out.bam
-        ch_versions   = ch_versions.mix(SAMTOOLS_SORT_NAME.out.versions)
-    
-        BISMARK_DEDUPLICATE(ch_bam_for_dedup)
+        ch_versions = ch_versions.mix(CORRECTUMI.out.versions)
+
+        /*
+         * Run deduplicate_bismark on name-sorted BAM
+         */
+        BISMARK_DEDUPLICATE (
+            CORRECTUMI.out.bam
+        )
         ch_bam_final = BISMARK_DEDUPLICATE.out.bam
-        ch_versions   = ch_versions.mix(BISMARK_DEDUPLICATE.out.versions)
-    }
-    else {
+        ch_versions  = ch_versions.mix(BISMARK_DEDUPLICATE.out.versions)
+    } else {
         // No deduplication: pass aligned BAM straight through
         ch_bam_final = ch_alignments
     }
 
     /*
-     * MODULE: Run samtools sort on aligned or deduplicated bam
+     * Coordinate-sort for downstream steps (methylation extractor, indexing, etc.)
      */
     SAMTOOLS_SORT (
         ch_bam_final,
         [[:],[]] // [ [meta], [fasta]]
     )
     ch_bam_final = SAMTOOLS_SORT.out.bam
+    ch_versions  = ch_versions.mix(SAMTOOLS_SORT.out.versions)
 
     /*
-     * MODULE: Run samtools index on aligned or deduplicated bam
+     * Index BAM
      */
     SAMTOOLS_INDEX (
         ch_bam_final
