@@ -7,10 +7,10 @@
 include { paramsSummaryMap          } from 'plugin/nf-schema'
 include { FASTQC                    } from '../../modules/nf-core/fastqc/main'
 include { FASTP                     } from '../../modules/nf-core/fastp/main'
-include { FASTP as FASTP_PRIMERS     } from '../../modules/nf-core/fastp/main'
-include { CUTADAPT                     } from '../../modules/nf-core/cutadapt/main'
+include { FASTP as FASTP_PRIMERS    } from '../../modules/nf-core/fastp/main'
+include { CUTADAPT                  } from '../../modules/nf-core/cutadapt/main'
 // Run FastQC again after umi trimming
-include { FASTQC as FASTQC_TRIM     } from '../../modules/nf-core/fastqc/main' 
+include { FASTQC as FASTQC_TRIM     } from '../../modules/nf-core/fastqc/main'
 include { TRIMGALORE                } from '../../modules/nf-core/trimgalore/main'
 include { QUALIMAP_BAMQC            } from '../../modules/nf-core/qualimap/bamqc/main'
 include { PRESEQ_LCEXTRAP           } from '../../modules/nf-core/preseq/lcextrap/main'
@@ -23,6 +23,9 @@ include { softwareVersionsToYAML    } from '../../subworkflows/nf-core/utils_nfc
 include { methodsDescriptionText    } from '../../subworkflows/local/utils_nfcore_methylseq_pipeline'
 include { validateInputSamplesheet  } from '../../subworkflows/local/utils_nfcore_methylseq_pipeline'
 
+// Local: rewrite FASTQ headers so UMI becomes final :<barcode> field for Bismark --barcode dedup
+include { FASTQ_UMI_TO_BARCODE      } from '../../modules/local/fastq_umi_to_barcode/main'
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN MAIN WORKFLOW
@@ -32,12 +35,12 @@ include { validateInputSamplesheet  } from '../../subworkflows/local/utils_nfcor
 workflow METHYLSEQ {
 
     take:
-    samplesheet        // channel: [ path(samplesheet.csv) ]
-    ch_versions        // channel: [ path(versions.yml)    ]
-    ch_fasta           // channel: [ path(fasta)           ]
-    ch_fasta_index     // channel: [ path(fasta index)     ]
-    ch_bismark_index   // channel: [ path(bismark index)   ]
-    ch_bwameth_index   // channel: [ path(bwameth index)   ]
+    samplesheet         // channel: [ path(samplesheet.csv) ]
+    ch_versions         // channel: [ path(versions.yml)    ]
+    ch_fasta            // channel: [ path(fasta)           ]
+    ch_fasta_index      // channel: [ path(fasta index)     ]
+    ch_bismark_index    // channel: [ path(bismark index)   ]
+    ch_bwameth_index    // channel: [ path(bwameth index)   ]
     ch_primer_fasta3    // channel: [ path(primer fasta 3-prime)]
     ch_primer_fasta5    // channel: [ path(primer fasta 5-prime)]
 
@@ -73,12 +76,20 @@ workflow METHYLSEQ {
     ch_fastq    = CAT_FASTQ.out.reads.mix(ch_samplesheet.single)
     ch_versions = ch_versions.mix(CAT_FASTQ.out.versions.first())
 
+    //
     // MODULE: run FASTP for UMI trimming
+    //
     if (params.has_umi) {
         FASTP( ch_fastq, [], false, false, false )
         ch_versions = ch_versions.mix(FASTP.out.versions)
 
-        ch_reads_to_trim = FASTP.out.reads
+        /*
+         * Rewrite read headers so UMI becomes final :<barcode> element.
+         * This is required for `deduplicate_bismark --barcode`.
+         */
+        FASTQ_UMI_TO_BARCODE( FASTP.out.reads )
+        ch_versions      = ch_versions.mix(FASTQ_UMI_TO_BARCODE.out.versions)
+        ch_reads_to_trim = FASTQ_UMI_TO_BARCODE.out.reads
 
         FASTQC( FASTP.out.reads )
         ch_versions = ch_versions.mix( FASTQC.out.versions )
@@ -86,13 +97,13 @@ workflow METHYLSEQ {
         ch_reads_to_trim = ch_fastq
     }
 
+    //
+    // Amplicon primer trimming (optional)
+    //
     if (params.amplicon) {
-        // FASTP_PRIMERS( ch_reads_to_trim, ch_primer_fasta, [], [], [] )
-        // ch_versions = ch_versions.mix( FASTP_PRIMERS.out.versions )
-
-        // ch_primer_trimmed_reads = FASTP_PRIMERS.out.reads
         CUTADAPT( ch_reads_to_trim, ch_primer_fasta3, ch_primer_fasta5 )
         ch_primer_trimmed_reads = CUTADAPT.out.reads
+        ch_versions = ch_versions.mix(CUTADAPT.out.versions.first())
     } else {
         ch_primer_trimmed_reads = ch_reads_to_trim
     }
@@ -110,9 +121,7 @@ workflow METHYLSEQ {
     }
 
     //
-
-    //
-    // MODULE: Run FastQC -- Moved to run after Trimgalore, as TrimGalore is used to remove poor quality
+    // MODULE: Run FastQC -- run after trimming
     //
     FASTQC_TRIM(
         ch_reads
@@ -123,14 +132,9 @@ workflow METHYLSEQ {
     ch_versions      = ch_versions.mix(FASTQC_TRIM.out.versions.first())
 
     //
-    // SUBWORKFLOW: Align reads, deduplicate and extract methylation with Bismark
+    // SUBWORKFLOW: Align reads, deduplicate and extract methylation
     //
-
-    // Aligner: bismark or bismark_hisat
     if ( params.aligner =~ /bismark/ ) {
-        //
-        // Run Bismark alignment + downstream processing
-        //
         FASTQ_ALIGN_DEDUP_BISMARK (
             ch_reads,
             ch_fasta,
@@ -143,7 +147,6 @@ workflow METHYLSEQ {
         ch_aligner_mqc = FASTQ_ALIGN_DEDUP_BISMARK.out.multiqc
         ch_versions    = ch_versions.mix(FASTQ_ALIGN_DEDUP_BISMARK.out.versions.unique{ it.baseName })
     }
-    // Aligner: bwameth
     else if ( params.aligner == 'bwameth' ){
 
         FASTQ_ALIGN_DEDUP_BWAMETH (
@@ -161,7 +164,6 @@ workflow METHYLSEQ {
 
     //
     // MODULE: Qualimap BamQC
-    // skipped by default. to use run with `--run_qualimap` param.
     //
     if(params.run_qualimap) {
         QUALIMAP_BAMQC (
@@ -174,7 +176,6 @@ workflow METHYLSEQ {
 
     //
     // MODULE: Preseq LCEXTRAP
-    // skipped by default. to use run with `--run_preseq` param.
     //
     if(params.run_preseq) {
         PRESEQ_LCEXTRAP (
@@ -245,16 +246,10 @@ workflow METHYLSEQ {
     )
 
     emit:
-    bam            = ch_bam                      // channel: [ val(meta), path(bam) ]
-    bai            = ch_bai                      // channel: [ val(meta), path(bai) ]
-    qualimap       = ch_qualimap                 // channel: [ val(meta), path(qualimap) ]
-    preseq         = ch_preseq                   // channel: [ val(meta), path(preseq) ]
-    multiqc_report = MULTIQC.out.report.toList() // channel: [ path(multiqc_report.html )  ]
-    versions       = ch_versions                 // channel: [ path(versions.yml) ]
+    bam            = ch_bam
+    bai            = ch_bai
+    qualimap       = ch_qualimap
+    preseq         = ch_preseq
+    multiqc_report = MULTIQC.out.report.toList()
+    versions       = ch_versions
 }
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    THE END
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
