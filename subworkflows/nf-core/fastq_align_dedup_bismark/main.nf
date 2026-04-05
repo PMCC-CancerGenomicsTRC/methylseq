@@ -1,5 +1,6 @@
 include { BISMARK_ALIGN                } from '../../../modules/nf-core/bismark/align/main'
 include { CORRECTUMI                   } from '../../../modules/local/correctumi'
+include { NAMESORT_BAM                 } from '../../../modules/local/namesort_bam/main'
 include { BISMARK_DEDUPLICATE          } from '../../../modules/nf-core/bismark/deduplicate/main'
 include { SAMTOOLS_SORT                } from '../../../modules/nf-core/samtools/sort/main'
 include { SAMTOOLS_INDEX               } from '../../../modules/nf-core/samtools/index/main'
@@ -70,12 +71,14 @@ workflow FASTQ_ALIGN_DEDUP_BISMARK {
     /*
      * Name-sort (again) for methylation extractor.
      * Methylation extractor in paired-end mode expects read pairs adjacent (queryname sort).
+     *
+     * NOTE: Can't call CORRECTUMI twice in the same workflow scope, so use NAMESORT_BAM here.
      */
-    CORRECTUMI (
+    NAMESORT_BAM (
         ch_bam_final
     )
-    ch_bam_for_extractor = CORRECTUMI.out.bam
-    ch_versions          = ch_versions.mix(CORRECTUMI.out.versions)
+    ch_bam_for_extractor = NAMESORT_BAM.out.bam
+    ch_versions          = ch_versions.mix(NAMESORT_BAM.out.versions)
 
     /*
      * Coordinate-sort for BAM indexing + downstream tools
