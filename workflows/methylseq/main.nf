@@ -82,15 +82,7 @@ workflow METHYLSEQ {
     if (params.has_umi) {
         FASTP( ch_fastq, [], false, false, false )
         ch_versions = ch_versions.mix(FASTP.out.versions)
-
-        /*
-         * Rewrite read headers so UMI becomes final :<barcode> element.
-         * This is required for `deduplicate_bismark --barcode`.
-         */
-        FASTQ_UMI_TO_BARCODE( FASTP.out.reads )
-        ch_versions      = ch_versions.mix(FASTQ_UMI_TO_BARCODE.out.versions)
-        ch_reads_to_trim = FASTQ_UMI_TO_BARCODE.out.reads
-
+        ch_reads_to_trim = FASTP.out.reads
         FASTQC( FASTP.out.reads )
         ch_versions = ch_versions.mix( FASTQC.out.versions )
     } else {
@@ -118,6 +110,12 @@ workflow METHYLSEQ {
         ch_versions = ch_versions.mix(TRIMGALORE.out.versions.first())
     } else {
         ch_reads    = ch_fastq
+    }
+    
+    if (params.has_umi) {
+        FASTQ_UMI_TO_BARCODE( ch_reads )
+        ch_versions = ch_versions.mix(FASTQ_UMI_TO_BARCODE.out.versions)
+        ch_reads    = FASTQ_UMI_TO_BARCODE.out.reads
     }
 
     //
