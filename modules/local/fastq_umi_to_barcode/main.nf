@@ -6,7 +6,7 @@ process FASTQ_UMI_TO_BARCODE {
     tuple val(meta), path(reads)
 
     output:
-    tuple val(meta), path("*_umiheader_*.fastq.gz"), emit: reads
+    tuple val(meta), path("*_umiheader_{1,2}.fastq.gz"), emit: reads
     path "versions.yml", emit: versions
 
     script:
@@ -21,21 +21,16 @@ process FASTQ_UMI_TO_BARCODE {
 
       zcat "\$in_fq" | \\
       awk 'NR%4==1 {
-             # Split header into first token and the rest (keeps " 1:N:0:..." unchanged)
+             # Header line. Split into first token and the rest (keeps " 1:N:0:..." unchanged)
              split(\$0, a, " ")
              h=a[1]
              rest=""
              if (length(\$0) > length(h)) rest=substr(\$0, length(h)+1)
 
-             # Replace ":UMI_<SEQ>" with ":<SEQ>"
-             sub(/:UMI_([A-Za-z]+)/, ":\\\\1", h)
-
-             # Uppercase the barcode and optionally restrict to ACGTN
-             if (match(h, /:([A-Za-z]+)$/, m)) {
-               b=toupper(m[1])
-               gsub(/[^ACGTN]/, "N", b)
-               sub(/:[A-Za-z]+$/, ":" b, h)
-             }
+             # Convert trailing ":UMI_<SEQ>" into ":<SEQ>"
+             # Example:
+             #   @VH...:1019:UMI_CCCT... -> @VH...:1019:CCCT...
+             sub(/:UMI_/, ":", h)
 
              print h rest
              next
@@ -44,6 +39,7 @@ process FASTQ_UMI_TO_BARCODE {
       | gzip -c > "\$out_fq"
     }
 
+    # reads is a list: [R1, R2]
     fix "${reads[0]}" "${prefix}_umiheader_1.fastq.gz"
     fix "${reads[1]}" "${prefix}_umiheader_2.fastq.gz"
 
