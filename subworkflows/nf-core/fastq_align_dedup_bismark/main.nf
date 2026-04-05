@@ -21,6 +21,7 @@ workflow FASTQ_ALIGN_DEDUP_BISMARK {
     ch_alignments                 = Channel.empty()
     ch_alignment_reports          = Channel.empty()
     ch_bam_final                  = Channel.empty()
+    ch_bam_for_extractor          = Channel.empty()
     ch_methylation_bedgraph       = Channel.empty()
     ch_methylation_calls          = Channel.empty()
     ch_methylation_coverage       = Channel.empty()
@@ -50,7 +51,6 @@ workflow FASTQ_ALIGN_DEDUP_BISMARK {
 
         /*
          * Name-sort BAM so paired reads are adjacent for deduplicate_bismark -p/--barcode
-         * (UMI should already be in the read ID from FASTQ header rewriting)
          */
         CORRECTUMI (
             ch_alignments
@@ -68,7 +68,17 @@ workflow FASTQ_ALIGN_DEDUP_BISMARK {
     }
 
     /*
-     * Coordinate-sort for downstream steps
+     * Name-sort (again) for methylation extractor.
+     * Methylation extractor in paired-end mode expects read pairs adjacent (queryname sort).
+     */
+    CORRECTUMI (
+        ch_bam_final
+    )
+    ch_bam_for_extractor = CORRECTUMI.out.bam
+    ch_versions          = ch_versions.mix(CORRECTUMI.out.versions)
+
+    /*
+     * Coordinate-sort for BAM indexing + downstream tools
      */
     SAMTOOLS_SORT (
         ch_bam_final,
@@ -78,16 +88,16 @@ workflow FASTQ_ALIGN_DEDUP_BISMARK {
     ch_versions  = ch_versions.mix(SAMTOOLS_SORT.out.versions)
 
     /*
-     * Index BAM
+     * Index BAM (coordinate-sorted)
      */
     SAMTOOLS_INDEX ( ch_bam_final )
     ch_bai      = SAMTOOLS_INDEX.out.bai
     ch_versions = ch_versions.mix(SAMTOOLS_INDEX.out.versions)
 
     /*
-     * Methylation extractor
+     * Methylation extractor (use NAME-SORTED BAM)
      */
-    BISMARK_METHYLATIONEXTRACTOR ( ch_bam_final, ch_bismark_index )
+    BISMARK_METHYLATIONEXTRACTOR ( ch_bam_for_extractor, ch_bismark_index )
     ch_methylation_bedgraph = BISMARK_METHYLATIONEXTRACTOR.out.bedgraph
     ch_methylation_calls    = BISMARK_METHYLATIONEXTRACTOR.out.methylation_calls
     ch_methylation_coverage = BISMARK_METHYLATIONEXTRACTOR.out.coverage
@@ -142,5 +152,4 @@ workflow FASTQ_ALIGN_DEDUP_BISMARK {
     bai      = ch_bai
     multiqc  = ch_multiqc_files
     versions = ch_versions
-    // (keep your other emits as you already have them)
 }
