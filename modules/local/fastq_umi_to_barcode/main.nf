@@ -21,25 +21,22 @@ process FASTQ_UMI_TO_BARCODE {
 
       zcat "\$in_fq" | \\
       awk 'NR%4==1 {
-             # Header line. Split into first token and the rest (keeps " 1:N:0:..." unchanged)
+             # Header line. Keep only the first token (up to first space).
+             # This prevents aligners from converting the trailing " 1:N:0:..." into "_1:N:0:..." in BAM QNAME,
+             # which breaks deduplicate_bismark --barcode parsing.
              split(\$0, a, " ")
              h=a[1]
-             rest=""
-             if (length(\$0) > length(h)) rest=substr(\$0, length(h)+1)
 
-             # Convert trailing ":UMI_<SEQ>" into ":<SEQ>"
-             # Example:
-             #   @VH...:1019:UMI_CCCT... -> @VH...:1019:CCCT...
+             # Convert ":UMI_<SEQ>" into ":<SEQ>"
              sub(/:UMI_/, ":", h)
 
-             print h rest
+             print h
              next
            }
            { print }' \\
       | gzip -c > "\$out_fq"
     }
 
-    # reads is a list: [R1, R2]
     fix "${reads[0]}" "${prefix}_umiheader_1.fastq.gz"
     fix "${reads[1]}" "${prefix}_umiheader_2.fastq.gz"
 
