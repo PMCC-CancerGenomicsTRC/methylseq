@@ -11,7 +11,7 @@ process CORRECTUMI {
     tuple val(meta), path(bam)
 
     output:
-    tuple val(meta), path("*_umiCorrect.namesorted.bam"), emit: bam
+    tuple val(meta), path("*_namesorted.bam"), emit: bam
     path "versions.yml", emit: versions
 
     script:
@@ -20,18 +20,8 @@ process CORRECTUMI {
     """
     set -euo pipefail
 
-    samtools view -h ${bam} | \\
-    awk 'BEGIN{FS=OFS="\\t"}
-         /^@/ { print; next }
-         {
-           # Extract UMI from a field like ...:UMI_<seq>_1:N:0:<index>
-           if (match(\$1, /:UMI_([^:_]+)/, m)) {
-               sub(/:UMI_.*/, ":" m[1], \$1)
-           }
-           print
-         }' | \\
-    samtools view -b -u - | \\
-    samtools sort -n -@ ${task.cpus} -o ${prefix}_umiCorrect.namesorted.bam -
+    # Name-sort so mates are adjacent for deduplicate_bismark -p / --barcode
+    samtools sort -n -@ ${task.cpus} -o ${prefix}_namesorted.bam ${bam}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
