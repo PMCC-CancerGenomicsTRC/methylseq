@@ -11,7 +11,7 @@ process CORRECTUMI {
     tuple val(meta), path(bam)
 
     output:
-    tuple val(meta), path("${prefix}_umiCorrect.namesorted.bam"), emit: bam
+    tuple val(meta), path("*_umiCorrect.namesorted.bam"), emit: bam
     path "versions.yml", emit: versions
 
     script:
@@ -26,7 +26,6 @@ process CORRECTUMI {
          {
            # Extract UMI from a field like ...:UMI_<seq>_1:N:0:<index>
            if (match(\$1, /:UMI_([^:_]+)/, m)) {
-               # Replace everything from :UMI_ onward with :<UMI>
                sub(/:UMI_.*/, ":" m[1], \$1)
            }
            print
